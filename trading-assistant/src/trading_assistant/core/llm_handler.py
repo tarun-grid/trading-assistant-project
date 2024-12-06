@@ -1,16 +1,21 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import json
 from anthropic import Anthropic
 from dotenv import load_dotenv
 import os
 
 class LLMHandler:
+    """
+    Handles all interactions with the Language Model (Claude), specifically for trading analysis.
+    Manages different personas (including Sophie) and maintains consistent response formats.
+    """
     def __init__(self, market_data):
+        """Initialize the LLM handler with market data and Sophie's personality."""
         load_dotenv()
         self.market_data = market_data
         self.client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         
-        # Sophie's personality traits
+        # Define Sophie's complete persona and boundaries
         self.sophie_persona = {
             "name": "Sophie",
             "style": "Growth Accelerator",
@@ -18,92 +23,185 @@ class LLMHandler:
                 "analysis": "hybrid_growth",
                 "risk_profile": "moderate_aggressive",
                 "expertise": ["growth_stocks", "momentum", "emerging_sectors"]
+            },
+            "boundaries": {
+                "focus": {
+                    "min_market_cap": 10_000_000_000,  # $10B minimum
+                    "min_revenue_growth": 15,  # 15% minimum
+                    "sectors": ["Technology", "Healthcare", "Consumer"]
+                },
+                "excludes": {
+                    "assets": ["crypto", "forex", "commodities"],
+                    "instruments": ["options", "futures", "derivatives"],
+                    "categories": ["penny_stocks", "micro_caps", "pre_revenue"]
+                }
             }
         }
-            
-    def process_command(self, command: str, persona: str = None) -> Dict[str, Any]:
-        """Process natural language command through Claude"""
+
+    def process_command(self, command: str, persona: str = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Process commands through Claude and return structured responses.
+        Returns tuple of (raw_response, structured_parameters).
+        """
         try:
-            # Extract command type and content
-            cmd_type = command.split()[0].strip('/')
-            content = ' '.join(command.split()[1:])
+            # Parse command components
+            cmd_parts = command.split()
+            cmd_type = cmd_parts[0].strip('/')
+            content = ' '.join(cmd_parts[1:])
             
             print(f"\n🤖 Processing: {cmd_type} command")
             print(f"Content: {content}")
+
+            # Get appropriate system prompt based on persona
+            system_prompt = self._get_sophie_prompt(cmd_type) if persona == "sophie" else self._get_system_prompt(cmd_type)
             
-            # Determine which system prompt to use
-            if persona == "sophie":
-                system_prompt = self._get_sophie_prompt(cmd_type)
-            else:
-                system_prompt = self._get_system_prompt(cmd_type)
-            
-            # Get response from Claude
-            response = self.client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=1000,
-                temperature=0.7 if persona == "sophie" else 0,
-                system=system_prompt,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": content
-                    }
-                ]
-            )
-            
-            # Debug print to see raw response
-            print("\n🔍 Raw LLM Response:")
-            print(response.content[0].text)
-            
-            raw_llm_response = parse_to_json(response.content[0].text)
-            
+            # Get LLM response with error handling
             try:
-                # Try to parse as JSON
-                result = json.loads(response.content[0].text)
+                response = self.client.messages.create(
+                    model="claude-3-sonnet-20240229",
+                    max_tokens=1000,
+                    temperature=0.7 if persona == "sophie" else 0,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": content}]
+                )
+                
+                # Process and structure the response
+                raw_text = response.content[0].text
+                print("\n🔍 Raw LLM Response:")
+                print(raw_text)
+                
+                # Parse response with enhanced error handling
+                raw_response = self._parse_llm_response(raw_text)
+                structured_params = self._structure_response(raw_response, cmd_type)
+                
                 print("\n📊 Structured Parameters:")
-                print(json.dumps(result, indent=2))
-                return (raw_llm_response, result)
-            except json.JSONDecodeError:
-                # If not valid JSON, create structured response
-                return (raw_llm_response, {
-                    "analysis": {
-                        "growth_metrics": {
-                            "revenue_growth": "Unknown",
-                            "earnings_growth": "Unknown",
-                            "margin_trends": "Unknown"
-                        },
-                        "momentum_signals": {
-                            "technical_rating": self._get_technical_rating(content),
-                            "price_trend": "Analyzing recent price action",
-                            "volume_analysis": "Analyzing volume patterns"
-                        },
-                        "market_position": {
-                            "sector_strength": "Unknown",
-                            "competitive_advantage": "Analyzing competitive position",
-                            "growth_catalysts": ["Analyzing potential catalysts"]
-                        }
-                    },
-                    "risk_assessment": {
-                        "risk_level": "moderate",
-                        "key_risks": ["Market volatility", "Sector-specific risks"],
-                        "risk_mitigants": ["Diversification", "Position sizing"]
-                    },
-                    "recommendation": {
-                        "action": "analyzing",
-                        "target_allocation": "0%",
-                        "entry_strategy": "Pending full analysis",
-                        "exit_conditions": ["Stop loss hit", "Target reached"]
-                    }
-                })
+                print(json.dumps(structured_params, indent=2))
+                
+                return raw_response, structured_params
+                
+            except Exception as e:
+                print(f"LLM Response Error: {str(e)}")
+                return self._get_fallback_response(cmd_type)
                 
         except Exception as e:
-            print(f"🚫 LLM Processing Error: {str(e)}")
+            print(f"🚫 Command Processing Error: {str(e)}")
             import traceback
             traceback.print_exc()
-            return None
+            return None, None
+
+    def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
+        """
+        Parse LLM response text into structured format, handling various response formats.
+        """
+        try:
+            # Handle markdown-wrapped JSON
+            if response_text.startswith('```'):
+                parts = response_text.split('```')
+                for part in parts:
+                    # Find the JSON content
+                    if part.strip().startswith('{'):
+                        response_text = part.strip()
+                        break
+            
+            # Clean the response text
+            response_text = response_text.replace('json\n', '').strip()
+            
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError as e:
+                print(f"JSON Parse Error: {str(e)}")
+                return self._extract_content_fallback(response_text)
+                
+        except Exception as e:
+            print(f"Response Parse Error: {str(e)}")
+            return {}
+
+    def _extract_content_fallback(self, text: str) -> Dict[str, Any]:
+        """
+        Extract meaningful content when JSON parsing fails.
+        Creates a structured format from unstructured text.
+        """
+        result = {
+            "raw_content": text,
+            "extracted_data": {}
+        }
+        
+        try:
+            # Extract key patterns
+            patterns = {
+                "growth_mentioned": ["growth", "revenue", "earnings"],
+                "technical_mentioned": ["rsi", "macd", "momentum"],
+                "risk_mentioned": ["risk", "volatility", "downside"]
+            }
+            
+            for key, terms in patterns.items():
+                result["extracted_data"][key] = any(term in text.lower() for term in terms)
+                
+        except Exception as e:
+            print(f"Content Extraction Error: {str(e)}")
+            
+        return result
+
+    def _structure_response(self, raw_response: Dict[str, Any], cmd_type: str) -> Dict[str, Any]:
+        """
+        Structure raw response into consistent format based on command type.
+        Ensures response maintains expected structure regardless of LLM output variations.
+        """
+        try:
+            if not raw_response:
+                return self._get_fallback_response(cmd_type)[1]
+                
+            structured = {}
+            
+            # Structure based on command type
+            if cmd_type == "analyze":
+                structured = {
+                    "analysis": raw_response.get("analysis", {}),
+                    "risk_assessment": raw_response.get("risk_assessment", {}),
+                    "recommendation": raw_response.get("recommendation", {})
+                }
+            elif cmd_type == "scan":
+                structured = {
+                    "scan_criteria": raw_response.get("scan_criteria", {}),
+                    "filters": raw_response.get("filters", {})
+                }
+            elif cmd_type == "build":
+                structured = {
+                    "strategy": raw_response.get("strategy", {}),
+                    "rules": raw_response.get("entry_rules", {})
+                }
+            else:
+                structured = raw_response
+                
+            return structured
+            
+        except Exception as e:
+            print(f"Response Structuring Error: {str(e)}")
+            return self._get_fallback_response(cmd_type)[1]
+
+    def _get_fallback_response(self, cmd_type: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Provide fallback responses when normal processing fails.
+        Ensures consistent response structure even in error cases.
+        """
+        fallback = {
+            "error": True,
+            "cmd_type": cmd_type,
+            "message": "Could not process request normally"
+        }
+        
+        structured = {
+            "analysis": {
+                "status": "error",
+                "message": "Analysis unavailable",
+                "fallback": True
+            }
+        }
+        
+        return fallback, structured
 
     def _get_technical_rating(self, symbol: str) -> str:
-        """Get technical rating based on market data"""
+        """Get technical rating based on market data."""
         try:
             data = self.market_data.fetch_data(symbol)
             if data is not None and not data.empty:
@@ -112,10 +210,9 @@ class LLMHandler:
                     return "overbought"
                 elif latest['RSI'] < 30:
                     return "oversold"
-                else:
-                    return "neutral"
-        except:
-            pass
+                return "neutral"
+        except Exception as e:
+            print(f"Technical Rating Error: {str(e)}")
         return "neutral"
             
     def _get_system_prompt(self, cmd_type: str) -> str:

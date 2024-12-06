@@ -65,22 +65,6 @@ def switch_persona(request: CommandRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/scan")
-def scan_market(request: CommandRequest):
-    try:
-        # Process through LLM
-        response = {"raw_llm_response": "", "structured_params": "", "result": {}}
-        
-        (raw_llm_response, structured_params) =  llm_handler.process_command(request.raw_input)
-        response["raw_llm_response"] = raw_llm_response
-        response["structured_params"] = structured_params
-        
-        result = scan_cmd.execute(structured_params)
-        response["result"] = result
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 @app.post("/analyze")
 def analyze_stock(request: CommandRequest):
     try:
@@ -161,17 +145,18 @@ def ai_trading_agent(request: CommandRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@app.post("/sophie")
+@app.post("/scan")
 def sophie(request: CommandRequest):
+    query = f"scan {request.raw_input}"
     try:
         # Process through LLM
         response = {"raw_llm_response": "", "structured_params": "", "result": {}}
         
-        (raw_llm_response, structured_params) = llm_handler.process_command(f"/sophie {request.raw_input}", persona="sophie")
+        (raw_llm_response, structured_params) = llm_handler.process_command(f"/sophie {query}", persona="sophie")
         response["raw_llm_response"] = raw_llm_response
         response["structured_params"] = structured_params
         
-        result = sophie_agent.execute(request.raw_input, structured_params)
+        result = sophie_agent.execute(query, structured_params)
         response["result"] = result
         return response
     except Exception as e:
