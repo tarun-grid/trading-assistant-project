@@ -1,0 +1,78 @@
+{
+    "rsi_reversal": {
+        "name": "RSI Reversal Strategy",
+        "description": "Advanced RSI strategy with multi-timeframe confirmation",
+        "parameters": {
+            "entry": {
+                "rsi_period": 12,
+                "rsi_overbought": 60,
+                "rsi_oversold": 30,
+                "confirmation_timeframe": "1h",
+                "min_volume_multiplier": 1.5
+            },
+            "filters": {
+                "trend_filter": true,
+                "volume_filter": true,
+                "volatility_filter": true,
+                "minimum_atr": 1.0,
+                "maximum_spread": 0.1
+            },
+            "risk_management": {
+                "position_size_pct": 2.0,
+                "stop_loss_atr_multiplier": 2.0,
+                "take_profit_atr_multiplier": 4.0,
+                "trailing_stop": true,
+                "trailing_stop_activation": 1.5,
+                "max_trades_per_day": 3
+            },
+            "timeframes": {
+                "primary": "1d",
+                "secondary": "1h",
+                "confirmation": "15m"
+            }
+        },
+        "rules": [
+            "1. Entry Rules:",
+            "   \u2022 Buy when RSI < oversold level (30) on primary timeframe",
+            "   \u2022 Sell when RSI > overbought level (70) on primary timeframe",
+            "   \u2022 Confirm with RSI direction on secondary timeframe",
+            "2. Filter Rules:",
+            "   \u2022 Trend must align on higher timeframe",
+            "   \u2022 Volume must be above average * multiplier",
+            "   \u2022 ATR must be above minimum threshold",
+            "3. Risk Management:",
+            "   \u2022 Position size: 2% of portfolio",
+            "   \u2022 Stop loss: 2 * ATR from entry",
+            "   \u2022 Take profit: 4 * ATR from entry",
+            "   \u2022 Enable trailing stop after 1.5 * ATR profit"
+        ]
+    },
+    "Testing": {
+        "timeframe": "1h",
+        "market_type": "Uptrend",
+        "portfolio": {
+            "size": 10000,
+            "max_position_pct": 20,
+            "risk_per_trade_pct": 1
+        },
+        "position_sizing": {
+            "type": "risk_based",
+            "max_position_size": 20,
+            "max_risk_per_trade": 1
+        },
+        "validation": {
+            "macd": "5%_max_portfolio",
+            "histogram": "Positive"
+        },
+        "trade": {
+            "take_profit": {
+                "type": "levels",
+                "values": [8.0, 12.0]
+            },
+            "stop_loss": {
+                "type": "entry_price",
+                "value": 5.0
+            }
+        }
+    }
+}
