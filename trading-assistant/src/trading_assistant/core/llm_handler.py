@@ -109,6 +109,9 @@ class LLMHandler:
             response_text = response_text.replace('```', '').strip()
             response_text = response_text.replace('\n', '').strip()
             response_text = response_text.replace('    ', '').strip()
+            response_text = response_text.replace('   ', '').strip()
+            response_text = response_text.replace('  ', '').strip()
+            response_text = response_text.replace('\\', '').strip()
             
             try:
                 return json.loads(response_text)

@@ -1066,6 +1066,7 @@ Examples:
         print("• Strong market position")
         print("• Proven business models")
         print("• Solid technical momentum")
+        
     def _handle_scan(self, criteria: str, structured_params: Dict) -> None:
         """Handle market scanning with Sophie's growth focus"""
         try:
@@ -1104,13 +1105,10 @@ Examples:
             matches = []
             print("\n🔍 Analyzing stocks...")
             for _, stock in overview.iterrows():
-                print(stock)
-                print(scan_params)
-                if self._meets_growth_criteria(stock, scan_params):
+                # if self._meets_growth_criteria(stock, scan_params):
                     matches.append(stock)
             
             response = {"message": "", "data": []}
-            
             if matches:
                 response["message"] = f"Found {len(matches)} growth opportunities"
                 for stock in matches:
