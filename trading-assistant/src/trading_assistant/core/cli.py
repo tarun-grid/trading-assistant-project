@@ -65,7 +65,7 @@ Type any command to get started!
                 return
                 
             # Get LLM insights with Sophie's persona
-            (raw_llm_response, structured_params) = self.llm_handler.process_command(f"/sophie {arg}", persona="sophie")
+            (_, structured_params) = self.llm_handler.process_command(f"/sophie {arg}", persona="sophie")
             
             # Execute command with LLM insights
             response = self.sophie.execute(arg, structured_params)

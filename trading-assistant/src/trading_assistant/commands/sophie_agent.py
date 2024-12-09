@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import os
 from pathlib import Path
+import json
 
 
 class SophieAgent:
@@ -1173,8 +1174,8 @@ Examples:
                 template = self.strategy_templates[template_name].copy()
                 
                 # Display strategy configuration
-                self._display_strategy(template)
-                
+                return self._display_strategy(template)
+            
                 # Handle strategy saving
                 save = input("\nWould you like to save this strategy? (y/n): ").lower()
                 if save == 'y':
@@ -1270,22 +1271,26 @@ Examples:
             Args:
                 strategy: Strategy configuration to display
             """
-            print("\n📈 Growth Strategy Overview:")
-            print(f"Strategy Name: {strategy.get('name', 'Growth Strategy')}")
-            print(f"Type: {strategy.get('risk_profile', 'growth')}")
-            print(f"Timeframe: {strategy.get('timeframe', '1d')}")
+            response = {
+                "strategy_overview": {
+                    "name": strategy.get("name", "Growth Strategy"),
+                    "type": strategy.get("risk_profile", "growth"),
+                    "timeframe": strategy.get("timeframe", "1d"),
+                },
+                "growth_criteria": {
+                    "min_revenue_growth": f'{strategy.get("growth_criteria", {}).get("revenue_growth_min")}%',
+                    "min_earnings_growth": f'{strategy.get("growth_criteria", {}).get("earnings_growth_min")}%',
+                    "min_market_cap": f"${strategy.get('growth_criteria', {}).get('market_cap_min', 0) / 1e9:.1f}B",
+                },
+                "technical_rules": {
+                    "rsi_range": strategy.get("technical_rules", {}).get("entry", {}).get("rsi_range", {}),
+                    "macd_signal": strategy.get("technical_rules", {}).get("entry", {}).get("macd_signal", "positive"),
+                    "volume_threshold": strategy.get("technical_rules", {}).get("entry", {}).get("volume_threshold"),
+                },
+            }
             
-            print("\n📊 Growth Criteria:")
-            growth = strategy.get('growth_criteria', {})
-            print(f"• Minimum Revenue Growth: {growth.get('revenue_growth_min')}%")
-            print(f"• Minimum Earnings Growth: {growth.get('earnings_growth_min')}%")
-            print(f"• Minimum Market Cap: ${growth.get('market_cap_min')/1e9:.1f}B")
-            
-            print("\n📈 Technical Rules:")
-            tech = strategy.get('technical_rules', {}).get('entry', {})
-            print(f"• RSI Range: {tech.get('rsi_range', {}).get('min')} - {tech.get('rsi_range', {}).get('max')}")
-            print(f"• MACD Signal: {tech.get('macd_signal', 'positive')}")
-            print(f"• Volume Threshold: {tech.get('volume_threshold')}x average")  
+            return response
+
 
     def _run_strategy_backtest(self, data: pd.DataFrame, strategy: Dict) -> Dict:
                 """Run backtest using strategy parameters"""
@@ -1437,8 +1442,8 @@ Examples:
             backtest_results = self._run_growth_strategy_backtest(historical_data, growth_metrics)
             
             # Present comprehensive results
-            self._present_backtest_results(symbol, backtest_results, growth_metrics)
-            
+            return self._present_backtest_results(symbol, backtest_results, growth_metrics)
+        
         except Exception as e:
             print(f"🚫 Backtest error: {str(e)}")
             import traceback
@@ -1569,39 +1574,69 @@ Examples:
 
     def _present_backtest_results(self, symbol: str, results: Dict, metrics: Dict) -> None:
         """Present comprehensive backtest results"""
-        print("\n📊 Backtest Configuration:")
-        print("• Strategy: Growth Momentum")
-        print("• Period: 5 Years")
-        print("• Initial Capital: $100,000")
-        print("• Position Size: 10%")
-        print("• Stop Loss: 8%")
-        
-        print("\n📈 Performance Summary:")
-        perf = results['performance']['metrics']
-        print(f"• Total Return: {perf['total_return']:.1f}%")
-        print(f"• Number of Trades: {perf['num_trades']}")
-        print(f"• Win Rate: {perf['win_rate']:.1f}%")
-        print(f"• Maximum Drawdown: {perf['max_drawdown']:.1f}%")
-        
-        print("\n🔄 Growth Trends:")
-        recent_growth = metrics['revenue_growth'][-4:] if metrics['revenue_growth'] else []
-        for period in recent_growth:
-            print(f"• {period['date'].strftime('%Y-%m')}: {period['growth']:.1f}% growth")
-        
-        print("\n⚠️ Risk Analysis:")
-        recent_vol = metrics['volatility'][-1] if metrics['volatility'] else {'value': 0}
-        print(f"• Recent Volatility: {recent_vol['value']:.1f}%")
-        print(f"• Risk-Adjusted Return: {perf['total_return']/abs(perf['max_drawdown']):.2f}")
-        
-        print("\n🎯 Strategy Insights:")
-        print("• Best performing entries occurred during strong growth momentum phases")
-        print("• Technical confirmation improved entry timing")
-        print("• Position sizing and stop-losses effectively managed drawdowns")
-        
-        print("\nWould you like to:")
-        print("1. Adjust strategy parameters")
-        print("2. Compare with other growth stocks")
-        print("3. View detailed trade history")
+        # Backtest configuration
+        backtest_config = {
+            "strategy": "Growth Momentum",
+            "period": "5 Years",
+            "initial_capital": "$100,000",
+            "position_size": "10%",
+            "stop_loss": "8%",
+        }
+
+        # Performance summary
+        perf = results["performance"]["metrics"]
+        performance_summary = {
+            "total_return": f"{round(perf['total_return'], 1)}%",
+            "number_of_trades": perf["num_trades"],
+            "win_rate": f"{round(perf['win_rate'], 1)}%",
+            "maximum_drawdown": f"{round(perf['max_drawdown'], 1)}%"
+        }
+
+        # Growth trends
+        recent_growth = metrics.get("revenue_growth", [])[-4:]
+        growth_trends = [
+            {
+                "date": period["date"].strftime("%Y-%m"),
+                "growth": f"{round(period['growth'], 1)}%"
+            }
+            for period in recent_growth
+        ]
+
+        # Risk analysis
+        recent_vol = metrics.get("volatility", [{}])[-1]
+        risk_analysis = {
+            "recent_volatility": f"{round(recent_vol.get('value', 0), 1)}%",
+            "risk_adjusted_return": round(
+                perf["total_return"] / abs(perf["max_drawdown"]), 2
+            ),
+        }
+
+        # Strategy insights
+        strategy_insights = [
+            "Best performing entries occurred during strong growth momentum phases",
+            "Technical confirmation improved entry timing",
+            "Position sizing and stop-losses effectively managed drawdowns",
+        ]
+
+        # User options
+        options = [
+            "Adjust strategy parameters",
+            "Compare with other growth stocks",
+            "View detailed trade history",
+        ]
+
+        # Combine everything into a JSON response
+        response = {
+            "symbol": symbol,
+            "backtest_configuration": backtest_config,
+            "performance_summary": performance_summary,
+            "growth_trends": growth_trends,
+            "risk_analysis": risk_analysis,
+            "strategy_insights": strategy_insights,
+            "options": options,
+        }
+
+        return response
 
     def _filter_growth_opportunities(self, overview: pd.DataFrame, params: Dict) -> list:
         """Filter for growth opportunities using LLM parameters"""

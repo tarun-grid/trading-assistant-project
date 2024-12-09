@@ -97,33 +97,35 @@ def load_strategy(request: CommandRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/build")
-def build_strategy(request: CommandRequest):
+@app.get("/build")
+def build_strategy():
+    query = f"build"
     try:
         # Process through LLM
         response = {"raw_llm_response": "", "structured_params": "", "result": {}}
         
-        (raw_llm_response, structured_params) =  llm_handler.process_command(request.raw_input)
+        (raw_llm_response, structured_params) =  llm_handler.process_command(f"/sophie {query}", persona="sophie")
         response["raw_llm_response"] = raw_llm_response
         response["structured_params"] = structured_params
         
-        result = build_cmd.execute(structured_params)
+        result = sophie_agent.execute(query, structured_params)
         response["result"] = result
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/backtest")
+@app.get("/backtest")
 def backtest_strategy(request: CommandRequest):
+    query = f"backtest {request.raw_input}"
     try:
         # Process through LLM
         response = {"raw_llm_response": "", "structured_params": "", "result": {}}
         
-        (raw_llm_response, structured_params) =  llm_handler.process_command(request.raw_input)
+        (raw_llm_response, structured_params) =  llm_handler.process_command(f"/sophie {query}", persona="sophie")
         response["raw_llm_response"] = raw_llm_response
         response["structured_params"] = structured_params
         
-        result = backtest_cmd.execute(structured_params)
+        result = sophie_agent.execute(query, structured_params)
         response["result"] = result
         return response
     except Exception as e:
@@ -145,7 +147,7 @@ def ai_trading_agent(request: CommandRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@app.post("/scan")
+@app.get("/scan")
 def sophie(request: CommandRequest):
     query = f"scan {request.raw_input}"
     try:

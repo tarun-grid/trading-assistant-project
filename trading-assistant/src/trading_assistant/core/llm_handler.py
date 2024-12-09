@@ -67,11 +67,12 @@ class LLMHandler:
                 
                 # Process and structure the response
                 raw_text = response.content[0].text
-                print("\n🔍 Raw LLM Response:")
-                print(raw_text)
-                
+
                 # Parse response with enhanced error handling
                 raw_response = self._parse_llm_response(raw_text)
+                print("\n🔍 Raw LLM Response:")
+                print(raw_response)
+                
                 structured_params = self._structure_response(raw_response, cmd_type)
                 
                 print("\n📊 Structured Parameters:")
@@ -88,7 +89,7 @@ class LLMHandler:
             import traceback
             traceback.print_exc()
             return None, None
-
+        
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """
         Parse LLM response text into structured format, handling various response formats.
@@ -105,6 +106,9 @@ class LLMHandler:
             
             # Clean the response text
             response_text = response_text.replace('json\n', '').strip()
+            response_text = response_text.replace('```', '').strip()
+            response_text = response_text.replace('\n', '').strip()
+            response_text = response_text.replace('    ', '').strip()
             
             try:
                 return json.loads(response_text)
@@ -398,18 +402,3 @@ class LLMHandler:
             }"""
 
         return base_prompt + " Return a JSON structure appropriate for the command context."
-    
-def parse_to_json(raw_json: str):
-    # Remove "```json\n"
-    if raw_json.startswith("```json"):
-        raw_json = raw_json[7:] 
-    
-    if raw_json.endswith("```"):
-        raw_json = raw_json[:-3]  # Remove trailing backticks
-
-    # Parse the JSON
-    try:
-        parsed_json = json.loads(raw_json)
-        return parsed_json
-    except json.JSONDecodeError as e:
-        print("Error parsing JSON:", e)
